@@ -2,14 +2,12 @@
 #include <stdio.h>        
 #include <stdlib.h> 
 #include <LPC17xx.H>
-#include <stdint.h>/* NXP LPC17xx definitions            */
+#include <stdint.h>/* NXP LPC17xx definitions */
 #include "string.h"
 #include "GLCD.h"
 #include "LED.h"
 #include "KBD.h"
 #include "Menu.h"
-
-//#include "game.h"
 
 // Define screen dimensions
 #define SCREEN_WIDTH  160
@@ -27,18 +25,18 @@
 #define PI 3.14159
 #define P2 PI/2
 #define P3 3*PI/2
-#define DR 0.0174533 //one degree
+#define DR 0.0174533 // one degree
 
 #define menuWidth 30
 #define menuHieght 120 * 2
 
-//mode defs
+// Mode definitions
 #define PIXEL_DRAW 2
 #define LINE_DRAW 1
 #define CIRCLE_DRAW 0
 #define MENU_MODE 3
 
-//menu defs
+// Menu item definitions
 #define MENU_CIRCLE 0 
 #define MENU_LINE  1 
 #define MENU_PIXEL 2 
@@ -47,33 +45,26 @@
 #define MENU_WIDTH 58
 #define MENU_ICON_HEIGHT 52
 
-
+// Global variables for menu and mode
 int MENU = MENU_CIRCLE;
 int MODE = PIXEL_DRAW; 
 
-
-
+// External variables
 extern unsigned char DRAWMEN_pixel_data[];
 extern unsigned char userPicture[6][48];
-
 extern unsigned char ClockLEDOn;
 
-//SysTick_Config(SystemCoreClock/50);  /* Generate interrupt every 20 ms     */
+// Player position and angle
+float playerX, playerY, playerAngle;
 
-float playerX, playerY, playerAngle; //player pos
-
-//#define mapX 8
-//#define mapY 8
-//#define mapS 64
-
+// Player coordinates
 int pX = 0, pY = 0;
 
-//int menuSpacing = 79;
+// Map dimensions
+int mapX = 8; 
+int mapY = 8;
 
-
-int mapX=8; int mapY=8;
-
-//--Histrory Array Def 
+// History array for storing previous positions
 int lastPressX;
 int lastPressY;
 
@@ -85,107 +76,72 @@ int lastPressY2;
 
 int hist[6];  // Format X0 Y0 X1 Y1 X2 Y2
 
-int map[]=
-{
-
-1,1,1,1,1,1,1,1,
-1,0,0,1,0,0,0,1,
-1,0,0,1,0,0,0,1,
-1,0,0,0,0,0,0,1,
-1,0,0,0,0,1,1,1,
-1,0,0,0,0,0,0,1,
-1,0,0,0,0,0,0,1,
-1,1,1,1,1,1,1,1
-
-};
-
+// Initialize the game
 void init(){
-	
-GLCD_Clear(LightGrey);
-pX= 1;// set player pos
-pY= 1;
-GLCD_SetBackColor(Black);
-GLCD_SetTextColor(Black);
-
-//playerAngle= 0;
+    GLCD_Clear(LightGrey);       // Clear the screen with LightGrey color
+    pX = 1;                       // Set initial player X position
+    pY = 1;                       // Set initial player Y position
+    GLCD_SetBackColor(Black);     // Set background color to Black
+    GLCD_SetTextColor(Black);     // Set text color to Black
+    // playerAngle = 0;           // Initialize player angle if needed
 }
 
+// Set the drawing color
 void setColor(int color){
-GLCD_SetBackColor(color);
-GLCD_SetTextColor(color);
-
+    GLCD_SetBackColor(color);     // Set background color
+    GLCD_SetTextColor(color);     // Set text color
 }
 
-//set mode
+// Set the current mode
 void setVarMode(int mode){
-
-	MODE = mode;
+    MODE = mode;
 }
-//return what next mode is
+
+// Get the next drawing mode
 int nextMode(int mode){
-
-int temp = mode;
-temp++;
-	
-if(temp > 3){
-return 0;
-}
-return temp;
+    int temp = mode;
+    temp++;
+    if(temp > 3){
+        return 0;
+    }
+    return temp;
 }
 
-
+// Get the previous drawing mode
 int prevMode(int mode){
-	
-	int temp = mode;
-temp--;
-	
-if(temp < 0){
-return 3;
-}
-return temp;
+    int temp = mode;
+    temp--;
+    if(temp < 0){
+        return 3;
+    }
+    return temp;
 }
 
+// Convert degrees to radians
 float degToRad(float angle) {
     return angle * PI / 180.0f;
 }
 
-
-
-//draw 1 pixel
+// Draw a single pixel
 void draw1Pixel(unsigned int x, unsigned int y){
-
-GLCD_PutPixel(x, y);
-
+    GLCD_PutPixel(x, y);
 }
 
-
-
-void drawPixel(unsigned int x, unsigned int y ){ //convert320x240 -> 160x120
-	
-//GLCD_SetBackColor(Black);
-
-	unsigned int newX = x*2;
-	unsigned int newY = y*2;
-	
-GLCD_PutPixel(newX, newY);
-GLCD_PutPixel(newX+1, newY);
-GLCD_PutPixel(newX, newY+1);
-GLCD_PutPixel(newX+1, newY+1);
-
-//GLCD_SetBackColor(LightGrey);
-
-	
+// Draw a pixel with scaling (160x120)
+void drawPixel(unsigned int x, unsigned int y){
+    unsigned int newX = x * 2;
+    unsigned int newY = y * 2;
+    
+    GLCD_PutPixel(newX, newY);
+    GLCD_PutPixel(newX + 1, newY);
+    GLCD_PutPixel(newX, newY + 1);
+    GLCD_PutPixel(newX + 1, newY + 1);
 }
 
-
-
-
-
-//draws line from x1y1 to x2y2 in 320x240
+// Draw a line using Bresenham's algorithm
 void drawLine(unsigned int x0, unsigned int y0, unsigned int x1, unsigned int y1){
-	 
-		unsigned int x = x0; // Create a copy of x0
-    unsigned int y = y0; // Create a copy of y0
+    unsigned int x = x0;
+    unsigned int y = y0;
 
     int dx = (x1 > x0) ? (x1 - x0) : (x0 - x1); // Absolute difference in x
     int dy = (y1 > y0) ? (y1 - y0) : (y0 - y1); // Absolute difference in y
@@ -194,58 +150,37 @@ void drawLine(unsigned int x0, unsigned int y0, unsigned int x1, unsigned int y1
     int err = dx - dy;                          // Error term
 
     while (1) {
-        draw1Pixel(x, y); // Plot the current pixel
-        if (x == x1 && y == y1) break;          // Check if we reached the endpoint
+        draw1Pixel(x, y);                      // Plot the current pixel
+        if (x == x1 && y == y1) break;          // Check if endpoint is reached
 
-        int e2 = 2 * err; // Scaled error term
+        int e2 = 2 * err;                       // Scaled error
         if (e2 > -dy) {
             err -= dy;
-            x += sx;  // Move in the x direction
+            x += sx;                            // Move in x direction
         }
         if (e2 < dx) {
             err += dx;
-            y += sy;  // Move in the y direction
+            y += sy;                            // Move in y direction
         }
     }
 }
 
-
-
-
-
-
-//draws rect from x,y with width and height
+// Draw a rectangle by drawing its edges
 void drawRect(unsigned int x, unsigned int y, unsigned int width, unsigned int height) {
-   
-	//setColor(Blue);
-	// Draw the top edge
-    drawLine(x, y, x + width-1, y);
-    // Draw the right edge
-    drawLine(x + width-1, y, x + width-1, y + height-1);
-    // Draw the bottom edge
-    drawLine(x + width - 1, y + height-1, x, y + height-1);
-    // Draw the left edge
-    drawLine(x, y + height - 1, x, y);
-	
-	//setColor(Black);
+    drawLine(x, y, x + width - 1, y);                     // Top edge
+    drawLine(x + width - 1, y, x + width - 1, y + height - 1); // Right edge
+    drawLine(x + width - 1, y + height - 1, x, y + height - 1); // Bottom edge
+    drawLine(x, y + height - 1, x, y);                    // Left edge
 }
 
-
+// Draw a filled rectangle by filling it line by line
 void drawFilledRect(unsigned int x, unsigned int y, unsigned int width, unsigned int height) {
-   
-	//setColor(Blue);
-	// Draw the top edge
-  
-		for (int i = 0; i<height;i++){
-		
-		drawLine(x,y+i, x+width-1,y+i);
-		
-		}
-	
-	//setColor(Black);
+    for (int i = 0; i < height; i++){
+        drawLine(x, y + i, x + width - 1, y + i);         // Draw each horizontal line
+    }
 }
 
-//draw circle
+// Draw a circle using Bresenham's algorithm
 void drawCircle(int xc, int yc, int radius) {
     int x = 0;
     int y = radius;
@@ -273,499 +208,335 @@ void drawCircle(int xc, int yc, int radius) {
     }
 }
 
-
-
-
+// Draw the pointer on the canvas
 void drawPointer(unsigned int x, unsigned int y){
-
-		setColor(Green);
-
-		drawRect((x)*5 - 1 + 80,(y)*5 - 1,7,7);
+    setColor(Green); // Set color to Green
+    drawRect((x) * 5 - 1 + 80, (y) * 5 - 1, 7, 7); // Draw pointer rectangle
 }
 
-
+// Remove the pointer from the canvas
 void removePointer(unsigned int x, unsigned int y){
-
-		setColor(White);
-	
-		drawRect((x)*5 - 1 + 80,(y)*5 - 1,7,7);
-
-		                                                                   
+    setColor(White); // Set color to White (background)
+    drawRect((x) * 5 - 1 + 80, (y) * 5 - 1, 7, 7); // Erase pointer rectangle
 }
 
-
-
+// Draw a 5x5 pixel block with specified color
 void draw5Pixel(unsigned int x, unsigned int y, int colour){
-
-
-setColor(colour);
-	
-drawFilledRect(x*5 + 80, y*5, 5, 5);
-
-	
+    setColor(colour); // Set drawing color
+    drawFilledRect(x * 5 + 80, y * 5, 5, 5); // Draw filled 5x5 block
 }
 
-
-
-
+// Move the pointer to a new location
 void movePointer(unsigned int x, unsigned int y){
-
-removePointer(pX, pY);
-drawPointer(x,y);
-
+    removePointer(pX, pY); // Remove current pointer
+    drawPointer(x, y);      // Draw new pointer
 }
 
-// Update player position based on input
-
-//updates single pixel on canvas
+// Update a single pixel on the canvas based on user input
 void canvasUpdatePixel(unsigned int x, unsigned int y){
+    unsigned int byteIndex = x / 8;             // Determine byte index
+    int bitIndex = x % 8;                        // Determine bit index
+    unsigned char byte = userPicture[byteIndex][y];
+    int bitValue = (byte >> (7 - bitIndex)) & 1; // Get bit value
 
-	unsigned int byteIndex = x / 8;
-	
-	int bitIndex = x % 8; //(0,7)
-	
-	unsigned char byte = userPicture[byteIndex][y];
-	
-	int bitValue = (byte >> (7 - bitIndex) & 1);
-	
-	if (bitValue == 1){
-	
-		draw5Pixel(x,y, Black);
-	}
-	
-	else draw5Pixel(x,y, White);
-	
-	
-
+    if (bitValue == 1){
+        draw5Pixel(x, y, Black);                // Draw black pixel
+    }
+    else {
+        draw5Pixel(x, y, White);                // Draw white pixel
+    }
 } 
 
+// Refresh the menu display
 void refreshMenu(){
-
-	GLCD_Bitmap(0,0, 60,240, DRAWMEN_pixel_data);
-
-
+    GLCD_Bitmap(0, 0, 60, 240, DRAWMEN_pixel_data); // Display menu bitmap
 }
 
-
+// Refresh the entire canvas display
 void refreshCanvas(){
-
-	int bitIndex = 0;
-	
-	 for (int col = 0; col < 6; col++) {
+    for (int col = 0; col < 6; col++) {
         for (int row = 0; row < 48; row++) {
             char byte = userPicture[col][row]; // Get the current byte
 
             // Process each bit in the byte
             for (int bit = 0; bit < 8; bit++) {
-                // Check if the bit is set
-							
-
-							
                 if (byte & (1 << bit)) {
-                    // Calculate the pixel's (x, y) position on the 48x48 screen
-                    int x = (col*8) + bit;      // Column position
-                    int y = row ;             // Row position
-                   
-                    // Draw the pixel (or a block for scaling)
-                    draw5Pixel(x, y, Black); // Use the put5Pixel function to draw the pixel
+                    int x = (col * 8) + bit;      // Calculate X position
+                    int y = row;                   // Y position
+                    draw5Pixel(x, y, Black);      // Draw black pixel
                 }
-								
-								else {
-									int x = (col*8) + bit;      // Column position
-                  int y = row;  
-									draw5Pixel(x, y, White);}
+                else {
+                    int x = (col * 8) + bit;      // Calculate X position
+                    int y = row;                   // Y position
+                    draw5Pixel(x, y, White);      // Draw white pixel
+                }
             }
         }
     }
-
-
 }
 
-
-
-
-
+// Refresh the canvas at the start of the game
 void refreshCanvasStart(){
-
-for (int col = 0; col < 48; col++) {
+    for (int col = 0; col < 48; col++) {
         for (int row = 0; row < 48; row++) {
-					
-					
-					canvasUpdatePixel(col,row);
-					
-				}
-				
-			}
-
+            canvasUpdatePixel(col, row); // Update each pixel
+        }
+    }
 }
 
+// Draw a pixel on the canvas with a specified color
 void canvasDrawPixel(unsigned int x, unsigned int y, int colour){
-	
-//input x is in range (0,47), but maps to specific bit in 6 bytes
-	
-	
-// array[6][48]
-//y stays y (0,47)
-//x depends on specfic bit (0,6) -> (0,47)
-	
-	
-	
-	//unsigned int newX = x;
-	
-	int byteIndex = x / 8;
-	int bitIndex = x % 8;
+    int byteIndex = x / 8;          // Determine byte index
+    int bitIndex = x % 8;           // Determine bit index
 
-if (colour == Black){
-	
-	//stes black
-	userPicture[byteIndex][y] |= (1 << (7-bitIndex));
+    if (colour == Black){
+        userPicture[byteIndex][y] |= (1 << (7 - bitIndex)); // Set bit to draw black
+    }
+    else {
+        userPicture[byteIndex][y] &= ~(1 << (7 - bitIndex)); // Clear bit to draw white
+    }
 
+    draw5Pixel(x, y, colour);       // Update the pixel on display
 }
 
-else{
-
-	//sets white
-	userPicture[byteIndex][y] &= (1 << (7-bitIndex));
-	
-}
-
-draw5Pixel(x, y, colour);
-
-}
-
-
-
-//menu logic functions, returns menu VAL after function
+// Move the menu selection up
 int menuUp(){
-
-int temp = MENU-1 ;
-
-if (temp < 0) temp = 3;	
-
-return temp;
-	
-	
+    int temp = MENU - 1;
+    if (temp < 0) temp = 3;          // Wrap around to last menu item
+    return temp;
 }
 
+// Move the menu selection down
 int menuDown(){
-
-int temp = MENU+1 ;	
-	
-	if (temp > 3) temp = 0;
-
-	return temp;
-	
+    int temp = MENU + 1;
+    if (temp > 3) temp = 0;          // Wrap around to first menu item
+    return temp;
 }
 
-
-//
+// Draw the menu pointer at the specified menu item
 void drawMenuPointer(int menuItem){
-
-setColor(Blue);
-
-	
-drawRect(1,(menuItem) *60 ,MENU_WIDTH, MENU_ICON_HEIGHT);
-
-	
-
-setColor(Black);
-
+    setColor(Blue);                                  // Set color to Blue
+    drawRect(1, (menuItem) * 60, MENU_WIDTH, MENU_ICON_HEIGHT); // Draw pointer rectangle
+    setColor(Black);                                 // Reset color to Black
 }
 
-
+// Draw the load menu pointer at the specified menu item
 void drawLoadMenuPointer(int menuItem){
-
-setColor(Red);
-
-	
-drawRect(1,(menuItem) *60 ,MENU_WIDTH, MENU_ICON_HEIGHT);
-
-	
-
-setColor(Black);
-
+    setColor(Red);                                   // Set color to Red
+    drawRect(1, (menuItem) * 60, MENU_WIDTH, MENU_ICON_HEIGHT); // Draw pointer rectangle
+    setColor(Black);                                 // Reset color to Black
 }
 
+// Remove the menu pointer from the specified menu item
 void removeMenuPointer(int menuItem){
-
-
-	setColor(White);	
-	drawRect(1,(menuItem) *60 ,MENU_WIDTH, MENU_ICON_HEIGHT);
-	setColor(Black);
-	
+    setColor(White);                                 // Set color to White (background)
+    drawRect(1, (menuItem) * 60, MENU_WIDTH, MENU_ICON_HEIGHT); // Erase pointer rectangle
+    setColor(Black);                                 // Reset color to Black
 }
 
+// Update the menu selection to the specified menu item
 void updateMenu(int menuItem){
-
-	removeMenuPointer(MENU);
-	
-	drawMenuPointer(menuItem);
-	
-	removeMenuPointer(MENU);
-	MENU = menuItem;
-	//removeMenuPointer(MENU);
+    removeMenuPointer(MENU);                         // Remove current menu pointer
+    drawMenuPointer(menuItem);                       // Draw new menu pointer
+    MENU = menuItem;                                 // Update current menu selection
 }
 
-//set mode
+// Set the current mode based on input
 void setMode(int mode){
-
-switch (mode)
-{
-	case MENU_MODE :
-		MODE = MENU_MODE;
-		removePointer(pX,pY);
-		drawMenuPointer(MENU);
-		break;
-	
-	case PIXEL_DRAW :
-		MODE = PIXEL_DRAW;
-		removeMenuPointer(MENU);
-		break;
-	
-	case CIRCLE_DRAW :
-		MODE = CIRCLE_DRAW;
-		removeMenuPointer(MENU);
-		break;
-	
-	case LINE_DRAW :
-		MODE = LINE_DRAW;
-		removeMenuPointer(MENU);
-		break;
-
-}
-
-}
-
-
-//refreshes the gap inbetween to clear stuck pointers
-void refreshGap(int y){
-
-	setColor(LightGrey);
-	drawFilledRect(60, (y * 5) -1, 20, 13);
-	setColor(Black);
-	
-}
-
-//update pointer func
-void updatePointer() {
-	
-		int input = get_button();
-	
-//----PRESSES UP -----
-	
-		//not in menu
-    if (input == KBD_UP && MODE != MENU_MODE) {
-   
-			removePointer(pX, pY);
-			canvasUpdatePixel(pX,pY);
-
-			pY--;
-			
-			//if (pX > 48 || pX < 1)pX = 1; 
-			if (pY > 48 || pY < 1) pY = 1;
-			
-			drawPointer(pX,pY);
-			
-    } 
-		
-		//--in menu
-		else if (input == KBD_UP && MODE == MENU_MODE){
-			
-			updateMenu(menuUp());
-		
-		
-		}
-//------ PRESSES DOWN --------
-		
-		//not in menu
-		else if (input == KBD_DOWN && MODE != MENU_MODE) {
-			
-			
-		removePointer(pX, pY);
-		canvasUpdatePixel(pX,pY);
-
-			
-			
-			pY++;
-			
-			//if (pX > 48 || pX < 1)pX = 1; 
-			if (pY > 48 || pY < 1) pY = 1;
-			
-			drawPointer(pX,pY);
-    } 
-		
-		//in menu
-		else if (input == KBD_DOWN && MODE == MENU_MODE){
-				
-				updateMenu(menuDown());
-				
-		}
-		
-		else if (input == KBD_LEFT && MODE != MENU_MODE) {
-			
-			//--
-			
-			
-
-			//--
-			
-			removePointer(pX, pY);
-			canvasUpdatePixel(pX,pY);
-
-		
-			
-				if (pX > 48)pX = 1; //dont need this
-			
-				if (pX < 1) {
-					setMode(MENU_MODE); refreshGap(pY);
-						} //set to menu mode
-			
-				else {
-					pX--;
-					drawPointer(pX,pY);
-					
-				}
-			
-    } else if (input == KBD_RIGHT) {
+    switch (mode)
+    {
+        case MENU_MODE:
+            MODE = MENU_MODE;
+            removePointer(pX, pY);                  // Remove current pointer
+            drawMenuPointer(MENU);                   // Draw menu pointer
+            break;
         
-				if(MODE != MENU_MODE) {
-			
-					removePointer(pX, pY);
-					canvasUpdatePixel(pX,pY);
-
-			
-					if (pX > 48 || pX < 1)pX = 1; //removePointer(pX + 1, pY); 
-			
-					pX++;
-					drawPointer(pX,pY);
-				}
-				
-				else{
-				
-				pX = 1;// pY =1;
-				refreshGap(pY);
-				setMode(PIXEL_DRAW);
-				drawPointer(pX,pY);
-				}
+        case PIXEL_DRAW:
+            MODE = PIXEL_DRAW;
+            removeMenuPointer(MENU);                 // Remove menu pointer
+            break;
+        
+        case CIRCLE_DRAW:
+            MODE = CIRCLE_DRAW;
+            removeMenuPointer(MENU);                 // Remove menu pointer
+            break;
+        
+        case LINE_DRAW:
+            MODE = LINE_DRAW;
+            removeMenuPointer(MENU);                 // Remove menu pointer
+            break;
     }
-		
-		
-		
-		
-		if (pX > 48 || pX < 0)pX = 1; 
-		if (pY > 48 || pY < 0) pY = 1;
 }
 
+// Refresh the gap between pointers to clear any stuck pointers
+void refreshGap(int y){
+    setColor(LightGrey);                             // Set color to LightGrey
+    drawFilledRect(60, (y * 5) - 1, 20, 13);        // Draw filled rectangle to refresh gap
+    setColor(Black);                                 // Reset color to Black
+}
 
-void draw5Line(unsigned int x0, unsigned int y0,unsigned int x1, unsigned int y1, int colour ){
+// Update the pointer position based on user input
+void updatePointer() {
+    int input = get_button();                        // Get user input
+    
+    // Handle UP button press
+    if (input == KBD_UP && MODE != MENU_MODE) {
+        removePointer(pX, pY);                       // Remove current pointer
+        canvasUpdatePixel(pX, pY);                   // Update canvas at current position
+        pY--;                                        // Move pointer up
+        if (pY > 48 || pY < 1) pY = 1;               // Boundary check
+        drawPointer(pX, pY);                         // Draw new pointer position
+    } 
+    // Handle UP button press in menu mode
+    else if (input == KBD_UP && MODE == MENU_MODE){
+        updateMenu(menuUp());                         // Move menu selection up
+    }
 
-unsigned int x = x0; // Create a copy of x0
-    unsigned int y = y0; // Create a copy of y0
+    // Handle DOWN button press
+    else if (input == KBD_DOWN && MODE != MENU_MODE) {
+        removePointer(pX, pY);                       // Remove current pointer
+        canvasUpdatePixel(pX, pY);                   // Update canvas at current position
+        pY++;                                        // Move pointer down
+        if (pY > 48 || pY < 1) pY = 1;               // Boundary check
+        drawPointer(pX, pY);                         // Draw new pointer position
+    } 
+    // Handle DOWN button press in menu mode
+    else if (input == KBD_DOWN && MODE == MENU_MODE){
+        updateMenu(menuDown());                       // Move menu selection down
+    }
+    
+    // Handle LEFT button press
+    else if (input == KBD_LEFT && MODE != MENU_MODE) {
+        removePointer(pX, pY);                       // Remove current pointer
+        canvasUpdatePixel(pX, pY);                   // Update canvas at current position
+        if (pX < 1) {
+            setMode(MENU_MODE);                       // Switch to menu mode
+            refreshGap(pY);                           // Refresh gap to clear pointer
+        } 
+        else {
+            pX--;                                      // Move pointer left
+            drawPointer(pX, pY);                      // Draw new pointer position
+        }
+    } 
+    // Handle RIGHT button press
+    else if (input == KBD_RIGHT) {
+        if(MODE != MENU_MODE) {
+            removePointer(pX, pY);                   // Remove current pointer
+            canvasUpdatePixel(pX, pY);               // Update canvas at current position
+            if (pX > 48 || pX < 1) pX = 1;           // Boundary check
+            pX++;                                    // Move pointer right
+            drawPointer(pX, y);                      // Draw new pointer position
+        }
+        else{
+            pX = 1;                                  // Reset X position
+            refreshGap(pY);                           // Refresh gap to clear pointer
+            setMode(PIXEL_DRAW);                      // Switch to pixel draw mode
+            drawPointer(pX, pY);                      // Draw pointer in new mode
+        }
+    }
 
-    int dx = (x1 > x0) ? (x1 - x0) : (x0 - x1); // Absolute difference in x
-    int dy = (y1 > y0) ? (y1 - y0) : (y0 - y1); // Absolute difference in y
-    int sx = (x0 < x1) ? 1 : -1;                // Step direction for x
-    int sy = (y0 < y1) ? 1 : -1;                // Step direction for y
-    int err = dx - dy;                          // Error term
+    // Ensure pointer stays within bounds
+    if (pX > 48 || pX < 0) pX = 1;                   
+    if (pY > 48 || pY < 0) pY = 1;
+}
+
+// Draw a line with 5x5 scaling
+void draw5Line(unsigned int x0, unsigned int y0, unsigned int x1, unsigned int y1, int colour ){
+    unsigned int x = x0;
+    unsigned int y = y0;
+
+    int dx = (x1 > x0) ? (x1 - x0) : (x0 - x1);
+    int dy = (y1 > y0) ? (y1 - y0) : (y0 - y1);
+    int sx = (x0 < x1) ? 1 : -1;
+    int sy = (y0 < y1) ? 1 : -1;
+    int err = dx - dy;
 
     while (1) {
-        draw5Pixel(x, y, colour); // Plot the current pixel
-        if (x == x1 && y == y1) break;          // Check if we reached the endpoint
+        draw5Pixel(x, y, colour);                   // Plot the current scaled pixel
+        if (x == x1 && y == y1) break;              // Check if endpoint is reached
 
-        int e2 = 2 * err; // Scaled error term
+        int e2 = 2 * err;                            // Scaled error
         if (e2 > -dy) {
             err -= dy;
-            x += sx;  // Move in the x direction
+            x += sx;                                  // Move in x direction
         }
         if (e2 < dx) {
             err += dx;
-            y += sy;  // Move in the y direction
+            y += sy;                                  // Move in y direction
         }
     }
 }
 
+// Draw a line on the canvas with specified color
+void canvasDrawLine(unsigned int x0, unsigned int y0, unsigned int x1, unsigned int y1, int colour){
+    unsigned int x = x0;
+    unsigned int y = y0;
 
-
-//draw line on canvas
-void canvasDrawLine(unsigned int x0, unsigned int y0,unsigned int x1, unsigned int y1, int colour){
-
-
-unsigned int x = x0; // Create a copy of x0
-    unsigned int y = y0; // Create a copy of y0
-
-    int dx = (x1 > x0) ? (x1 - x0) : (x0 - x1); // Absolute difference in x
-    int dy = (y1 > y0) ? (y1 - y0) : (y0 - y1); // Absolute difference in y
-    int sx = (x0 < x1) ? 1 : -1;                // Step direction for x
-    int sy = (y0 < y1) ? 1 : -1;                // Step direction for y
-    int err = dx - dy;                          // Error term
+    int dx = (x1 > x0) ? (x1 - x0) : (x0 - x1);
+    int dy = (y1 > y0) ? (y1 - y0) : (y0 - y1);
+    int sx = (x0 < x1) ? 1 : -1;
+    int sy = (y0 < y1) ? 1 : -1;
+    int err = dx - dy;
 
     while (1) {
-        canvasDrawPixel(x, y, colour); // Plot the current pixel
-        if (x == x1 && y == y1) break;          // Check if we reached the endpoint
+        canvasDrawPixel(x, y, colour);             // Plot the current pixel on canvas
+        if (x == x1 && y == y1) break;             // Check if endpoint is reached
 
-        int e2 = 2 * err; // Scaled error term
+        int e2 = 2 * err;                            // Scaled error
         if (e2 > -dy) {
             err -= dy;
-            x += sx;  // Move in the x direction
+            x += sx;                                  // Move in x direction
         }
         if (e2 < dx) {
             err += dx;
-            y += sy;  // Move in the y direction
+            y += sy;                                  // Move in y direction
         }
     }
-
 }
 
+// Update a line on the canvas by redrawing affected pixels
+void canvasUpdateLine(unsigned int x0, unsigned int y0, unsigned int x1, unsigned int y1){
+    unsigned int x = x0;
+    unsigned int y = y0;
 
-
-
-
-
-void canvasUpdateLine(unsigned int x0, unsigned int y0,unsigned int x1, unsigned int y1){
-
-
-unsigned int x = x0; // Create a copy of x0
-    unsigned int y = y0; // Create a copy of y0
-
-    int dx = (x1 > x0) ? (x1 - x0) : (x0 - x1); // Absolute difference in x
-    int dy = (y1 > y0) ? (y1 - y0) : (y0 - y1); // Absolute difference in y
-    int sx = (x0 < x1) ? 1 : -1;                // Step direction for x
-    int sy = (y0 < y1) ? 1 : -1;                // Step direction for y
-    int err = dx - dy;                          // Error term
+    int dx = (x1 > x0) ? (x1 - x0) : (x0 - x1);
+    int dy = (y1 > y0) ? (y1 - y0) : (y0 - y1);
+    int sx = (x0 < x1) ? 1 : -1;
+    int sy = (y0 < y1) ? 1 : -1;
+    int err = dx - dy;
 
     while (1) {
-        canvasUpdatePixel(x, y); // Plot the current pixel
-        if (x == x1 && y == y1) break;          // Check if we reached the endpoint
+        canvasUpdatePixel(x, y);                   // Update the current pixel on canvas
+        if (x == x1 && y == y1) break;             // Check if endpoint is reached
 
-        int e2 = 2 * err; // Scaled error term
+        int e2 = 2 * err;                            // Scaled error
         if (e2 > -dy) {
             err -= dy;
-            x += sx;  // Move in the x direction
+            x += sx;                                  // Move in x direction
         }
         if (e2 < dx) {
             err += dx;
-            y += sy;  // Move in the y direction
+            y += sy;                                  // Move in y direction
         }
     }
-
 }
 
-
+// Draw a circle on the canvas with specified radius
 void canvasDrawCircle(int xc, int yc, int radius){
     int x = 0;
     int y = radius;
     int d = 3 - 2 * radius; // Initial decision parameter
 
     while (x <= y) {
-        // Draw the 8 symmetric points of the circle
-        canvasDrawPixel(xc + x, yc + y, Black);  // 1st quadrant
-        canvasDrawPixel(xc - x, yc + y, Black);  // 2nd quadrant
-        canvasDrawPixel(xc + x, yc - y, Black);  // 3rd quadrant
-        canvasDrawPixel(xc - x, yc - y, Black);  // 4th quadrant
-        canvasDrawPixel(xc + y, yc + x, Black);  // 5th quadrant
-        canvasDrawPixel(xc - y, yc + x, Black);  // 6th quadrant
-        canvasDrawPixel(xc + y, yc - x, Black);  // 7th quadrant
-        canvasDrawPixel(xc - y, yc - x, Black);  // 8th quadrant
+        // Draw the 8 symmetric points of the circle on the canvas
+        canvasDrawPixel(xc + x, yc + y, Black);
+        canvasDrawPixel(xc - x, yc + y, Black);
+        canvasDrawPixel(xc + x, yc - y, Black);
+        canvasDrawPixel(xc - x, yc - y, Black);
+        canvasDrawPixel(xc + y, yc + x, Black);
+        canvasDrawPixel(xc - y, yc + x, Black);
+        canvasDrawPixel(xc + y, yc - x, Black);
+        canvasDrawPixel(xc - y, yc - x, Black);
 
         // Update decision parameter and coordinates
         if (d <= 0) {
@@ -778,125 +549,90 @@ void canvasDrawCircle(int xc, int yc, int radius){
     }
 }
 
-
+// Main game loop
 void game(){
-int histNum = 0; //stores number of saved points
-int cHistNum = 0; //for circle
-unsigned int lineframeCounter = 0;
-unsigned int circleframeCounter = 0;
-unsigned int menuframeCounter = 0;
-
-	
-	
-init();
-refreshMenu();
-
-draw5Pixel(4,4, White);
-
-	int rad = 0;
-	refreshCanvasStart();
-
-	drawPointer(pX,pY);
-	
-for(;;){
-
-	//------DEFAULT UPDATE-------
-	if (ClockLEDOn) { ClockLEDOn = 0; updatePointer(); }
-	
-	
-
-	
-	//------ Draw Pixel ---------
-	if(get_button() == KBD_SELECT && MODE == PIXEL_DRAW){
-	
-		canvasDrawPixel(pX,pY, Black);
-		
-	}
-	
-	
-	
-		
-		//---- Line draw------	
-		lineframeCounter++;
-		if(get_button() == KBD_SELECT && MODE == LINE_DRAW){
-			drawLoadMenuPointer(MENU);
-			if (histNum == 0 && lineframeCounter > 30) {
-		
-				lastPressX1 = pX;
-				lastPressY1 = pY;
-		
-				histNum = 1;
-				lineframeCounter = 0;		
-			}
-		
-			else if (histNum == 1 && lineframeCounter > 30) {
-		
-				lastPressX2 = pX;
-				lastPressY2 = pY;
-		
-				canvasDrawLine(lastPressX1,lastPressY1, lastPressX2, lastPressY2, Black);
-
-				histNum=0;	
-				lineframeCounter = 0;
-			}
-		}
-	
-	//------- Change Mode & Refresh --------
-	if(get_button() == KBD_SELECT && MODE == MENU_MODE){
-	
-		if (MENU == MENU_SAVE){
-		
-		drawLoadMenuPointer(MENU_SAVE);
-		refreshCanvasStart();
-		removeMenuPointer(MENU_SAVE);
-		
-		}
-		else MODE = MENU; //set mode to current Menu Selection
-	}
-	
-	
-	
-	
-	
-	
-
-	//------ Circle Draw--------
-	circleframeCounter++;
-	if(get_button() == KBD_SELECT && MODE == CIRCLE_DRAW){
-				drawLoadMenuPointer(MENU);
-
-		if (cHistNum == 0 && circleframeCounter > 30) {
-		
-				lastPressX1 = pX;
-				lastPressY1 = pY;
-		
-				cHistNum = 1;
-				circleframeCounter = 0;		
-			}
-		
-			else if (cHistNum == 1 && circleframeCounter > 30) {
-		
-				lastPressX2 = pX;
-				lastPressY2 = pY;
-				
-				rad = fmax( abs(lastPressX1 - pX)/2 , abs(lastPressX2 - pY)/2);
-		
-				canvasDrawCircle(lastPressX1,lastPressY1, rad);
-
-				cHistNum=0;	
-				circleframeCounter = 0;
-			}
-		
-		//canvasDrawCircle(20,20, 7);
-		
-	}
-	
-	
-	if (get_button() == KBD_LEFT && MODE == MENU_MODE){
-	return;
-	}
-
-};	
-
-
+    int histNum = 0;          // Stores number of saved points for line drawing
+    int cHistNum = 0;         // Stores number of saved points for circle drawing
+    unsigned int lineframeCounter = 0;
+    unsigned int circleframeCounter = 0;
+    unsigned int menuframeCounter = 0;
+    
+    init();                   // Initialize game settings
+    refreshMenu();            // Display the menu
+    
+    draw5Pixel(4, 4, White);  // Draw an initial white pixel
+    
+    int rad = 0;              // Initialize radius for circle drawing
+    refreshCanvasStart();     // Refresh the entire canvas at start
+    
+    drawPointer(pX, pY);      // Draw the initial pointer position
+    
+    for(;;){                  // Infinite game loop
+        // Default update based on clock
+        if (ClockLEDOn) { 
+            ClockLEDOn = 0; 
+            updatePointer(); 
+        }
+        
+        // Handle drawing a single pixel
+        if(get_button() == KBD_SELECT && MODE == PIXEL_DRAW){
+            canvasDrawPixel(pX, pY, Black); // Draw black pixel at pointer
+        }
+        
+        // Handle line drawing
+        lineframeCounter++;
+        if(get_button() == KBD_SELECT && MODE == LINE_DRAW){
+            drawLoadMenuPointer(MENU); // Indicate line drawing mode
+            if (histNum == 0 && lineframeCounter > 30) {
+                lastPressX1 = pX;
+                lastPressY1 = pY;
+                histNum = 1;
+                lineframeCounter = 0;		
+            }   
+            else if (histNum == 1 && lineframeCounter > 30) {
+                lastPressX2 = pX;
+                lastPressY2 = pY;
+                canvasDrawLine(lastPressX1, lastPressY1, lastPressX2, lastPressY2, Black); // Draw the line
+                histNum = 0;	
+                lineframeCounter = 0;
+            }
+        }
+        
+        // Handle menu selection and mode change
+        if(get_button() == KBD_SELECT && MODE == MENU_MODE){
+            if (MENU == MENU_SAVE){
+                drawLoadMenuPointer(MENU_SAVE);       // Indicate save action
+                refreshCanvasStart();                 // Refresh canvas
+                removeMenuPointer(MENU_SAVE);         // Remove save pointer
+            }
+            else {
+                MODE = MENU;                          // Set mode to current menu selection
+            }
+        }
+        
+        // Handle circle drawing
+        circleframeCounter++;
+        if(get_button() == KBD_SELECT && MODE == CIRCLE_DRAW){
+            drawLoadMenuPointer(MENU); // Indicate circle drawing mode
+            if (cHistNum == 0 && circleframeCounter > 30) {
+                lastPressX1 = pX;
+                lastPressY1 = pY;
+                cHistNum = 1;
+                circleframeCounter = 0;		
+            }   
+            else if (cHistNum == 1 && circleframeCounter > 30) {
+                lastPressX2 = pX;
+                lastPressY2 = pY;
+                rad = fmax(abs(lastPressX1 - pX)/2, abs(lastPressY1 - pY)/2); // Calculate radius
+                canvasDrawCircle(lastPressX1, lastPressY1, rad); // Draw the circle
+                cHistNum = 0;	
+                circleframeCounter = 0;
+            }
+        }
+        
+        // Handle exiting menu mode
+        if (get_button() == KBD_LEFT && MODE == MENU_MODE){
+            return; // Exit the game loop
+        }
+    };	
 }
