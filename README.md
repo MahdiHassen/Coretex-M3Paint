@@ -49,4 +49,15 @@ The paint application is part of a general media center that includes:
 - **Image Viewer**: View and manage images stored on the device.
 - **Audio Playback**: Use board as a USB speaker.
 
+## Logic Diagrams
+
+**Function Buildup:**
+
+<img width="504" alt="image" src="https://github.com/user-attachments/assets/da303c85-a555-454b-9969-d8cdcf6494af" />
+
+
+**Drawing State Machine:**
+<img width="462" alt="image" src="https://github.com/user-attachments/assets/ac89fdc7-ea08-4834-9979-4d55fa0186c9" />
+
+
 
