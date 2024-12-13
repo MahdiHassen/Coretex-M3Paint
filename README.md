@@ -40,7 +40,7 @@ This project is a paint application developed for the Cortex-M3 microcontroller.
 
 ## Files
 
-The code for M3 Paint mainly lies in the **game.c** file.
+The code for M3 Paint mainly lies in  **src/game.c**.
 
 ## Media Center
 
