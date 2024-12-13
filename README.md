@@ -9,9 +9,9 @@ This project is a paint application developed for the Cortex-M3 microcontroller.
   - **Line Draw**: Draw lines between two points.
   - **Circle Draw**: Draw circles with a specified radius.
 - **Interactive Menu**: Easily switch between different drawing modes and settings.
-- **Media Center Integration**: Part of a larger media center project, offering additional functionalities like image viewing and media playback.
+- **Media Center Integration**: Part of a larger media center project, can display images and play audio via USB
 
-## Getting Started
+## Running it Yourself
 
 ### Prerequisites
 
