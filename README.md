@@ -57,6 +57,7 @@ The paint application is part of a general media center that includes:
 
 
 **Drawing State Machine:**
+
 <img width="462" alt="image" src="https://github.com/user-attachments/assets/ac89fdc7-ea08-4834-9979-4d55fa0186c9" />
 
 
