@@ -1,6 +1,6 @@
 # Cortex-M3 Paint Application
 
-This project is a paint application developed for the Cortex-M3 microcontroller. It allows users to draw on the LCD display using various drawing modes and provides an interactive menu for easy navigation.
+This project is a paint application developed for the NPXLPC1768 Cortex M3-based microcontroller. It allows users to draw on the LCD display using various drawing modes and provides an interactive menu for easy navigation.
 
 ## Features
 
